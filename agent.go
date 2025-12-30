@@ -63,7 +63,7 @@ type piggybackingController struct {
 	packets      []packetWithCrc
 	packetsIndex int
 	acks         []uint32
-	dtlsCallback func(packet []byte)
+	dtlsCallback func(packet []byte, rAddr net.Addr)
 }
 
 // Agent represents the ICE agent.
@@ -1618,7 +1618,7 @@ func (a *Agent) getSelectedPair() *CandidatePair {
 	return nil
 }
 
-func (a *Agent) SetDtlsCallback(cb func(packet []byte)) {
+func (a *Agent) SetDtlsCallback(cb func(packet []byte, rAddr net.Addr)) {
 	a.piggyback.mu.Lock()
 	defer a.piggyback.mu.Unlock()
 	a.piggyback.dtlsCallback = cb
@@ -1666,7 +1666,7 @@ func (a *Agent) GetPiggybackDataAndAcks() ([]byte, []uint32) {
 	return result, a.piggyback.acks
 }
 
-func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32) {
+func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32, rAddr net.Addr) {
 	a.piggyback.mu.Lock()
 
 	if a.piggyback.state == PiggybackingStateComplete || a.piggyback.state == PiggybackingStateOff {
@@ -1718,7 +1718,7 @@ func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32) {
 		a.piggyback.acks = []uint32{}
 	}
 
-	var dtlsCallback func(packet []byte)
+	var dtlsCallback func(packet []byte, rAddr net.Addr)
 	// Handle the incoming packet. Calculate and store the crc32 of the packet
 	// for acks, then notify the DTLS packet.
 	if a.piggyback.dtlsCallback != nil && len(packet) > 0 {
@@ -1735,7 +1735,7 @@ func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32) {
 	a.piggyback.mu.Unlock()
 
 	if dtlsCallback != nil {
-		dtlsCallback(packet)
+		dtlsCallback(packet, rAddr)
 	}
 }
 
