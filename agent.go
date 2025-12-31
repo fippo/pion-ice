@@ -1635,8 +1635,8 @@ func (a *Agent) Piggyback(packet []byte) bool {
 		return a.connectionState != ConnectionStateConnected
 	}
 
-	crc := crc32.ChecksumIEEE(packet)
 	if packet != nil {
+		crc := crc32.ChecksumIEEE(packet)
 		a.piggyback.packets = append(a.piggyback.packets, packetWithCrc{packet, crc})
 	} else {
 		a.piggyback.state = PiggybackingStatePending
@@ -1737,6 +1737,23 @@ func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32, rAddr net.Addr)
 	if dtlsCallback != nil {
 		dtlsCallback(packet, rAddr)
 	}
+}
+
+func (a *Agent) ReportDtlsPacket(packet []byte) {
+	a.piggyback.mu.Lock()
+
+	if a.piggyback.state == PiggybackingStateComplete || a.piggyback.state == PiggybackingStateOff {
+		a.piggyback.mu.Unlock()
+		return
+	}
+	crc := crc32.ChecksumIEEE(packet)
+	if !slices.Contains(a.piggyback.acks, crc) {
+		a.piggyback.acks = append(a.piggyback.acks, crc)
+		if len(a.piggyback.acks) > 4 {
+			a.piggyback.acks = a.piggyback.acks[1:]
+		}
+	}
+	a.piggyback.mu.Unlock()
 }
 
 func (a *Agent) closeMulticastConn() {
