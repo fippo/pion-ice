@@ -26,6 +26,14 @@ type controllingSelector struct {
 	log           logging.LeveledLogger
 }
 
+func reportPiggybacking(agent *Agent, message *stun.Message, remote Candidate) {
+	var dtls DtlsInStunAttribute
+	_ = dtls.GetFrom(message)
+	var ack DtlsInStunAckAttribute
+	_ = ack.GetFrom(message)
+	s.agent.ReportPiggybacking(dtls, ack, remote.addr())
+}
+
 func (s *controllingSelector) Start() {
 	s.startTime = time.Now()
 	s.nominatedPair = nil
@@ -115,15 +123,7 @@ func (s *controllingSelector) nominatePair(pair *CandidatePair) {
 }
 
 func (s *controllingSelector) HandleBindingRequest(message *stun.Message, local, remote Candidate) { //nolint:cyclop
-	var dtls DtlsInStunAttribute
-	if err := dtls.GetFrom(message); err == nil {
-		// fmt.Println("DTLS IN STUN (CONTROLLING)", dtls)
-	}
-	var ack DtlsInStunAckAttribute
-	if err := ack.GetFrom(message); err == nil {
-		// fmt.Println("DTLS IN STUN ACK (CONTROLLING)", ack)
-	}
-	s.agent.ReportPiggybacking(dtls, ack, remote.addr())
+	reportPiggybacking(s.agent, message, remote.addr())
 
 	s.agent.sendBindingSuccess(message, local, remote)
 
@@ -181,16 +181,8 @@ func (s *controllingSelector) HandleSuccessResponse(m *stun.Message, local, remo
 		return
 	}
 
-	var dtls DtlsInStunAttribute
-	if err := dtls.GetFrom(m); err == nil {
-		// fmt.Println("DTLS IN STUN (CONTROLLED) RESPONSE", dtls)
-	}
-	var ack DtlsInStunAckAttribute
-	if err := ack.GetFrom(m); err == nil {
-		// fmt.Println("DTLS IN STUN ACK (CONTROLLED) RESPONSE", ack)
-	}
 	// TODO: get the implicit ack from the pendingRequest.
-	s.agent.ReportPiggybacking(dtls, ack, remoteAddr)
+	reportPiggybacking(s.agent, message, remote.addr())
 
 	s.log.Tracef("Inbound STUN (SuccessResponse) from %s to %s", remote, local)
 	pair := s.agent.findPair(local, remote)
@@ -232,7 +224,6 @@ func (s *controllingSelector) PingCandidate(local, remote Candidate) {
 		PriorityAttr(local.Priority()),
 	}
 	if packet, acks := s.agent.GetPiggybackDataAndAcks(); acks != nil {
-		// fmt.Println("PIGGY(CONTROLLING) REQUEST", len(packet), len(acks))
 		if acks != nil {
 			attributes = append(attributes, DtlsInStunAckAttribute(acks))
 		}
@@ -394,7 +385,6 @@ func (s *controlledSelector) PingCandidate(local, remote Candidate) {
 		PriorityAttr(local.Priority()),
 	}
 	if packet, acks := s.agent.GetPiggybackDataAndAcks(); acks != nil {
-		// fmt.Println("PIGGY(CONTROLLED) REQUEST", len(packet), len(acks))
 		if acks != nil {
 			attributes = append(attributes, DtlsInStunAckAttribute(acks))
 		}
@@ -472,15 +462,7 @@ func (s *controlledSelector) HandleSuccessResponse(m *stun.Message, local, remot
 }
 
 func (s *controlledSelector) HandleBindingRequest(message *stun.Message, local, remote Candidate) { //nolint:cyclop
-	var dtls DtlsInStunAttribute
-	if err := dtls.GetFrom(message); err == nil {
-		// fmt.Println("DTLS IN STUN (CONTROLLED)", dtls)
-	}
-	var ack DtlsInStunAckAttribute
-	if err := ack.GetFrom(message); err == nil {
-		// fmt.Println("DTLS IN STUN ACK (CONTROLLED)", ack)
-	}
-	s.agent.ReportPiggybacking(dtls, ack, remote.addr())
+	reportPiggybacking(s.agent, message, remote.addr())
 
 	pair := s.agent.findPair(local, remote)
 	if pair == nil {

@@ -1360,7 +1360,6 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
 		},
 	}
 	if packet, acks := a.GetPiggybackDataAndAcks(); acks != nil {
-		// fmt.Println("PIGGY (SUCCESS)", len(packet), len(acks))
 		if acks != nil {
 			attributes = append(attributes, DtlsInStunAckAttribute(acks))
 		}
@@ -1675,16 +1674,15 @@ func (a *Agent) ReportPiggybacking(packet []byte, acks []uint32, rAddr net.Addr)
 	}
 	if packet == nil && acks == nil && a.piggyback.state == PiggybackingStateTentative {
 		// Any pending packets will be flushed later when the ICE connection gets established.
-		fmt.Println("Piggybacking discovered as not supported, falling back to normal state")
+		a.log.Infof("Piggybacking discovered as not supported, falling back to normal state")
 		a.piggyback.dtlsCallback = nil
 		a.piggyback.state = PiggybackingStateOff
 		a.piggyback.mu.Unlock()
 		return
 	}
 	if packet == nil && acks == nil && a.piggyback.acks != nil {
+		a.log.Infof("Done with the SPED handshake", a.piggyback.state)
 		// TODO: check that we are in pending state?
-		fmt.Println("Done with the SPED handshake", a.piggyback.state)
-		// Clear our buffer and acks? Can we stop reporting piggybacking?
 		a.piggyback.acks = nil
 		a.piggyback.state = PiggybackingStateComplete
 		a.piggyback.mu.Unlock()
